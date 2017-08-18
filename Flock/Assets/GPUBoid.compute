@@ -1,0 +1,90 @@
+﻿
+
+
+#pragma kernel Flock
+
+struct BoidData
+{
+	float3 position;
+	float3 velocity;
+    float3 acceleration;
+};
+
+RWStructuredBuffer<BoidData> boidBufferRead;
+RWStructuredBuffer<BoidData> boidBufferWrite;
+int bufferSize;
+float REGION_SIZE;
+float MAX_SPEED;
+float MAX_FORCE;
+float NEIGHBOR_DISTANCE;
+
+//void ApplyForce(uint1 id, float3 force)
+//{
+//    boidBufferWrite[id,1,1].acceleration = boidBufferRead[id,1,1].acceleration + force;
+//}
+
+[numthreads(256,1,1)]
+void Flock (uint3 id : SV_DispatchThreadID)
+{
+	// TODO: insert actual code here!
+
+
+
+ //   float alignCount = 0;
+ //   float3 alignSum = 0;
+
+
+	//[loop]
+ //   for (int i = 0; i < bufferSize; i++)
+ //   {
+ //       alignSum += distance(boidBufferRead[id.x].velocity, boidBufferRead[i].velocity);
+ //       alignCount++;
+ //   }
+
+	//if (alignCount > 0)
+ //   {
+ //       alignSum = alignSum / alignCount;
+ //       float3 alignForce = 10*alignSum - boidBufferRead[id.x].velocity;
+ //       //boidBufferWrite[id.x].position = boidBufferRead[id.x].position + alignSum;
+ //       boidBufferWrite[id.x].acceleration = boidBufferRead[id.x].acceleration + alignForce;
+ //   }
+
+	/////// CHECK FOR BOUND$
+
+    float3 swerve = float3(0, 0, 0);
+
+	if (boidBufferRead[id.x].position.x > REGION_SIZE)
+    {
+        swerve.x = -MAX_SPEED;
+    }
+    else if (boidBufferRead[id.x].position.x < 0)
+    {
+        swerve.x = MAX_SPEED;
+    }
+    else if (boidBufferRead[id.y].position.y > REGION_SIZE)
+    {
+        swerve.y = -MAX_SPEED;
+    }
+    else if (boidBufferRead[id.y].position.y < 0)
+    {
+        swerve.y = MAX_SPEED;
+    }
+    //else if (boidBufferRead[id.z].position.z > REGION_SIZE)
+    //{
+    //    swerve.z = -MAX_SPEED;
+    //}
+    //else if (boidBufferRead[id.z].position.z < 0)
+    //{
+    //    swerve.z = MAX_SPEED;
+    //}
+
+    boidBufferWrite[id.x].acceleration = boidBufferRead[id.x].acceleration + swerve;
+    boidBufferWrite[id.x].acceleration = clamp(boidBufferWrite[id.x].acceleration, 0, MAX_FORCE);
+
+
+
+	boidBufferWrite[id.x].velocity = boidBufferRead[id.x].velocity + boidBufferRead[id.x].acceleration;
+	boidBufferWrite[id.x].position = boidBufferRead[id.x].position + boidBufferRead[id.x].velocity;
+    boidBufferWrite[id.x].acceleration = float3(0, 0, 0);
+}
+
