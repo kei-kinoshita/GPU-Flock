@@ -22,6 +22,8 @@ public class GPUBoidController : MonoBehaviour {
     private int kernelFlock;
 
     private bool _DrawGizmos;
+
+
 	// Use this for initialization
 	void Start () {
         SetUpCS();
@@ -40,6 +42,7 @@ public class GPUBoidController : MonoBehaviour {
        
 
     }
+
     struct BoidData
     {
         public Vector3 position;
