@@ -500,16 +500,19 @@ public class BoidController : MonoBehaviour {
         }
     }
 
-    //private void OnDrawGizmos()
     //{
-    //    for (int i=0; i<numBoids; i++)
-    //    {
-    //        Gizmos.color = Color.Lerp(Color.cyan, Color.magenta, boids[i].numNeighbors/30f);
     //        //Gizmos.DrawSphere(boids[i].position,0.5f);
-    //        Gizmos.DrawLine(boids[i].position, boids[i].position + 2*boids[i].velocity);
-    //        //Gizmos.DrawLine(boids[i].position, boids[i].position + 2 * boids[i].acceleration);
     //    }
-    //}
+    private void OnDrawGizmos()
+    {
+        for (int i = 0; i < numBoids; i++)
+        {
+            Gizmos.color = Color.Lerp(Color.cyan, Color.magenta, boids[i].numNeighbors / 30f);
+            //Gizmos.DrawSphere(boids[i].position,0.5f);
+            Gizmos.DrawLine(boids[i].position, boids[i].position + 2 * boids[i].velocity);
+            //Gizmos.DrawLine(boids[i].position, boids[i].position + 2 * boids[i].acceleration);
+        }
+    }
 
     //public struct boid
     //{

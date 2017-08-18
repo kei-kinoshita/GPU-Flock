@@ -90,7 +90,7 @@ public class GPUBoidController : MonoBehaviour {
             Gizmos.color = Color.white;
             foreach (BoidData b in boidsIn)
             {
-                Gizmos.DrawSphere(b.position, 2f);
+                Gizmos.DrawLine(b.position, b.position + b.velocity);
             }
         }
     }

@@ -53,22 +53,41 @@ void Flock (uint3 id : SV_DispatchThreadID)
 
     float3 swerve = float3(0, 0, 0);
 
-	if (boidBufferRead[id.x].position.x > REGION_SIZE)
+	//if (boidBufferRead[id.x].position.x > REGION_SIZE)
+ //   {
+ //       swerve.x = -MAX_SPEED;
+ //   }
+ //   else if (boidBufferRead[id.x].position.x < 0)
+ //   {
+ //       swerve.x = MAX_SPEED;
+ //   }
+ //   else if (boidBufferRead[id.y].position.y > REGION_SIZE)
+ //   {
+ //       swerve.y = -MAX_SPEED;
+ //   }
+ //   else if (boidBufferRead[id.y].position.y < 0)
+ //   {
+ //       swerve.y = MAX_SPEED;
+ //   }
+
+    if (boidBufferRead[id.x].position.x > REGION_SIZE)
     {
-        swerve.x = -MAX_SPEED;
+        boidBufferRead[id.x].position.x = 0;
     }
     else if (boidBufferRead[id.x].position.x < 0)
     {
-        swerve.x = MAX_SPEED;
+        boidBufferRead[id.x].position.x = REGION_SIZE;
     }
-    else if (boidBufferRead[id.y].position.y > REGION_SIZE)
+    else if (boidBufferRead[id.x].position.y > REGION_SIZE)
     {
-        swerve.y = -MAX_SPEED;
+        boidBufferRead[id.x].position.y = 0;
     }
-    else if (boidBufferRead[id.y].position.y < 0)
+    else if (boidBufferRead[id.x].position.y < 0)
     {
-        swerve.y = MAX_SPEED;
+        boidBufferRead[id.x].position.y = REGION_SIZE;
     }
+
+    //swerve = clamp(swerve, 0, MAX_FORCE);
     //else if (boidBufferRead[id.z].position.z > REGION_SIZE)
     //{
     //    swerve.z = -MAX_SPEED;
@@ -79,11 +98,11 @@ void Flock (uint3 id : SV_DispatchThreadID)
     //}
 
     boidBufferWrite[id.x].acceleration = boidBufferRead[id.x].acceleration + swerve;
-    boidBufferWrite[id.x].acceleration = clamp(boidBufferWrite[id.x].acceleration, 0, MAX_FORCE);
-
-
+    //boidBufferWrite[id.x].acceleration = clamp(boidBufferWrite[id.x].acceleration, 0, MAX_FORCE);
 
 	boidBufferWrite[id.x].velocity = boidBufferRead[id.x].velocity + boidBufferRead[id.x].acceleration;
+    //boidBufferWrite[id.x].velocity = clamp(boidBufferWrite[id.x].velocity, 0, MAX_SPEED);
+
 	boidBufferWrite[id.x].position = boidBufferRead[id.x].position + boidBufferRead[id.x].velocity;
     boidBufferWrite[id.x].acceleration = float3(0, 0, 0);
 }
