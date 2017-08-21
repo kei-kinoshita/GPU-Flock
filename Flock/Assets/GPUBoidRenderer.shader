@@ -40,7 +40,7 @@
 	float4 frag (v2f i) : SV_Target
 	{
 		//return float4(1, 1, 1, 1);
-		return float4(1,0,0,1)*smoothstep(500,0,i.neighbors) + float4(0,1,0,1)*smoothstep(2000,0,i.neighbors);
+		return float4(1,0.5,0.5,1)*smoothstep(0,1000,i.neighbors) + float4(0.5,0.7,1,1)*smoothstep(1000,0,i.neighbors);
 	}
 	ENDCG
 

@@ -8,14 +8,36 @@ struct BoidData
     int numNeighbors;
 };
 
+//struct BoidFlockCalcuations
+//{
+//    float3 align;
+//    float3 cohesion;
+//    float3 separation;
+//};
+
+struct Magnet
+{
+    float3 position;
+    float range;
+    bool isAttractor;
+};
+
 RWStructuredBuffer<BoidData> boidBufferRead;
 RWStructuredBuffer<BoidData> boidBufferWrite;
-int bufferSize;
+RWStructuredBuffer<Magnet> magnetBufferRead;
+
+int BUFFER_SIZE;
+int BLOCK_SIZE;
+float DELTA_TIME;
 float REGION_SIZE;
 float MAX_SPEED;
 float MAX_FORCE;
 float NEIGHBOR_DISTANCE;
 float BOID_RADIUS;
+
+
+int NUM_MAGNETS;
+
 float3 TARGET_1;
 float3 TARGET_2;
 float3 TARGET_3;
@@ -40,31 +62,45 @@ float3 ClampFloat3Magnitude(float3 vector3, float magnitude)
 
 float3 Seek(uint3 id, float3 target)
 {
+    float distFromBoidToTarget = distance(boidBufferRead[id.x].position, target);
+
     float3 desired = target - boidBufferRead[id.x].position;
     desired = MAX_SPEED * normalize(desired);
     float3 steer = desired - boidBufferRead[id.x].velocity;
     steer = ClampFloat3Magnitude(steer, MAX_FORCE);
     steer = lerp(float3(0, 0, 0), steer, distance(boidBufferRead[id.x].position, target) / 100);
+    //steer = ((NEIGHBOR_DISTANCE * 2) * ((smoothstep(0, NEIGHBOR_DISTANCE * 2, distFromBoidToTarget)), 2)) * steer;
     return steer;
+}
 
+float3 SeekAttractor(uint3 id, float3 target)
+{
+    float distFromBoidToTarget = distance(boidBufferRead[id.x].position, target);
+
+    float3 desired = target - boidBufferRead[id.x].position;
+    desired = MAX_SPEED * normalize(desired);
+    float3 steer = desired - boidBufferRead[id.x].velocity;
+    steer = ClampFloat3Magnitude(steer, MAX_FORCE);
+    //steer = lerp(float3(0, 0, 0), steer, distance(boidBufferRead[id.x].position, target) / 100);
+    steer = ((NEIGHBOR_DISTANCE * 2) * ((smoothstep(0, NEIGHBOR_DISTANCE * 2, distFromBoidToTarget)), 2)) * steer;
+    return steer;
 }
 
 float3 Escape(uint3 id, float3 target)
 {
-
     float distFromBoidToTarget = distance(boidBufferRead[id.x].position, target);
     float3 desired = target - boidBufferRead[id.x].position;
     desired = MAX_SPEED * normalize(desired);
     float3 steer = boidBufferRead[id.x].velocity - desired;
     steer = ClampFloat3Magnitude(steer, MAX_FORCE);
-    steer = steer* (distFromBoidToTarget / (REGION_SIZE/5));
-    return steer;
+    //steer = steer* (distFromBoidToTarget / (REGION_SIZE/5));
+    steer = ((NEIGHBOR_DISTANCE)*pow((1-smoothstep(0, NEIGHBOR_DISTANCE, distFromBoidToTarget)),2) ) *steer;
 
+    return steer;
 }
 
 
-
-[numthreads(16,1,1)]
+[numthreads(256,1,1)]
 void Flock (uint3 id : SV_DispatchThreadID)
 {
 
@@ -98,29 +134,7 @@ void Flock (uint3 id : SV_DispatchThreadID)
     //}
 
 
-    /// MIRROR$MIRROR ///
 
-    //if (boidBufferRead[id.x].position.x > REGION_SIZE)
-    //{
-    //    boidBufferRead[id.x].position.x = 0;
-    //}
-    //else if (boidBufferRead[id.x].position.x < 0)
-    //{
-    //    boidBufferRead[id.x].position.x = REGION_SIZE;
-    //}
-    //else if (boidBufferRead[id.x].position.y > REGION_SIZE)
-    //{
-    //    boidBufferRead[id.x].position.y = 0;
-    //}
-    //else if (boidBufferRead[id.x].position.y < 0)
-    //{
-    //    boidBufferRead[id.x].position.y = REGION_SIZE;
-    //}
-
-    //swerve = clamp(swerve, 0, MAX_FORCE);
-
-    //boidBufferWrite[id.x].acceleration = boidBufferRead[id.x].acceleration + swerve;
-    //boidBufferWrite[id.x].acceleration = clamp(boidBufferWrite[id.x].acceleration, 0, MAX_FORCE);
     swerve = ClampFloat3Magnitude(swerve, MAX_FORCE);
     ApplyForce(id, swerve);
 
@@ -139,7 +153,7 @@ void Flock (uint3 id : SV_DispatchThreadID)
     int cohesionCount = 0;
 
 	[loop]
-    for (int i = 0; i < bufferSize; i++)
+    for (int i = 0; i < BUFFER_SIZE; i++)
     {
         distBetweenBoidAndOther = distance(boidBufferRead[id.x].position, boidBufferRead[i].position);
 
@@ -150,7 +164,6 @@ void Flock (uint3 id : SV_DispatchThreadID)
             separationSum += diffBetweenBoidAndOther;
             separationCount++;
         }
-
         
         if (distBetweenBoidAndOther > 0 && distBetweenBoidAndOther < NEIGHBOR_DISTANCE)
         {
@@ -166,25 +179,42 @@ void Flock (uint3 id : SV_DispatchThreadID)
         
     }
 
+    if (NUM_MAGNETS > 0)
+    {
+        [loop]
+        for (int i = 0; i < NUM_MAGNETS; i++)
+        {
+            if (magnetBufferRead[i].isAttractor)
+            {
+                ApplyForce(id, SeekAttractor(id, magnetBufferRead[i].position));
+            }
+            else
+            {
+                ApplyForce(id, Escape(id, magnetBufferRead[i].position));
+            }
+        }
+
+    }
+
     //ApplyForce(id, Escape(id, TARGET_1));
-    //ApplyForce(id, Seek(id, TARGET_2));
-    //ApplyForce(id, Seek(id, TARGET_3));
+    //ApplyForce(id, Escape(id, TARGET_2));
+    //ApplyForce(id, Escape(id, TARGET_3));
 
     if (cohesionCount > 0)
     {
         cohesionSum /= cohesionCount;
         ApplyForce(id, Seek(id, cohesionSum));
-
-        boidBufferRead[id.x].numNeighbors = cohesionCount;
     }
 
     if (alignCount > 0)
     {
         alignSum = alignSum / alignCount;
         alignSum = normalize(alignSum) * MAX_SPEED;
-        //alignSum = ClampFloat3Magnitude(alignSum, MAX_SPEED);
         alignSum = ClampFloat3Magnitude(alignSum - boidBufferRead[id.x].velocity,MAX_FORCE);
         ApplyForce(id, alignSum);
+
+
+        boidBufferWrite[id.x].numNeighbors = cohesionCount;
     }
 
     if (separationCount > 0)
@@ -199,7 +229,7 @@ void Flock (uint3 id : SV_DispatchThreadID)
 
     boidBufferWrite[id.x].velocity = ClampFloat3Magnitude(boidBufferRead[id.x].velocity + boidBufferRead[id.x].acceleration, MAX_SPEED);
 
-	boidBufferWrite[id.x].position = boidBufferRead[id.x].position + boidBufferWrite[id.x].velocity;
+	boidBufferWrite[id.x].position = boidBufferRead[id.x].position + boidBufferWrite[id.x].velocity*DELTA_TIME;
     boidBufferWrite[id.x].acceleration = float3(0, 0, 0);
     //// fix below later
     boidBufferRead[id.x] = boidBufferWrite[id.x];
