@@ -26,8 +26,10 @@ RWStructuredBuffer<BoidData> boidBufferRead;
 RWStructuredBuffer<BoidData> boidBufferWrite;
 RWStructuredBuffer<Magnet> magnetBufferRead;
 
+#define BLOCK_SIZE 256
+
+
 int BUFFER_SIZE;
-int BLOCK_SIZE;
 float DELTA_TIME;
 float REGION_SIZE;
 float MAX_SPEED;
@@ -73,8 +75,11 @@ float3 Seek(uint3 id, float3 target)
     return steer;
 }
 
+//////// TODO: needs to be fixed
 float3 SeekAttractor(uint3 id, float3 target)
 {
+
+    
     float distFromBoidToTarget = distance(boidBufferRead[id.x].position, target);
 
     float3 desired = target - boidBufferRead[id.x].position;
@@ -82,7 +87,8 @@ float3 SeekAttractor(uint3 id, float3 target)
     float3 steer = desired - boidBufferRead[id.x].velocity;
     steer = ClampFloat3Magnitude(steer, MAX_FORCE);
     //steer = lerp(float3(0, 0, 0), steer, distance(boidBufferRead[id.x].position, target) / 100);
-    steer = ((NEIGHBOR_DISTANCE * 2) * ((smoothstep(0, NEIGHBOR_DISTANCE * 2, distFromBoidToTarget)), 2)) * steer;
+    steer = ((NEIGHBOR_DISTANCE * 2) * (1-(smoothstep(0, NEIGHBOR_DISTANCE * 2, distFromBoidToTarget)), 2)-NEIGHBOR_DISTANCE) * steer;
+    
     return steer;
 }
 
@@ -94,18 +100,16 @@ float3 Escape(uint3 id, float3 target)
     float3 steer = boidBufferRead[id.x].velocity - desired;
     steer = ClampFloat3Magnitude(steer, MAX_FORCE);
     //steer = steer* (distFromBoidToTarget / (REGION_SIZE/5));
-    steer = ((NEIGHBOR_DISTANCE)*pow((1-smoothstep(0, NEIGHBOR_DISTANCE, distFromBoidToTarget)),2) ) *steer;
+    steer = ((NEIGHBOR_DISTANCE*2)*pow((1-smoothstep(0, NEIGHBOR_DISTANCE*2, distFromBoidToTarget)),2) ) *steer;
 
     return steer;
 }
 
 
-[numthreads(256,1,1)]
+[numthreads(BLOCK_SIZE,1,1)]
 void Flock (uint3 id : SV_DispatchThreadID)
 {
-
 	/////// CHECK FOR BOUND$
-
     float3 swerve = float3(0, 0, 0);
 
 	if (boidBufferRead[id.x].position.x > REGION_SIZE)

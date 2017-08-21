@@ -83,7 +83,6 @@ public class GPUBoidController : MonoBehaviour {
         //CS.SetVector("TARGET_2", target2.transform.position);
         //CS.SetVector("TARGET_3", target3.transform.position);
 
-        CS.SetInt("BLOCK_SIZE", blockSize);
         CS.Dispatch(kernelFlock, boidsIn.Length/blockSize, 1, 1);
 
 
@@ -122,7 +121,7 @@ public class GPUBoidController : MonoBehaviour {
         boidsIn = new BoidData[numBoids];
         boidsOut = new BoidData[numBoids];
 
-        Random.InitState(0);
+        Random.InitState(42);
         for (int i=0; i<numBoids; i++)
         {
             boidsIn[i].position = new Vector3(Random.value * regionSize, Random.value * regionSize, 0);
@@ -135,8 +134,8 @@ public class GPUBoidController : MonoBehaviour {
         kernelFlock = CS.FindKernel("Flock");
         boidBufferRead = new ComputeBuffer(numBoids, Marshal.SizeOf(typeof(BoidData)));
         boidBufferWrite = new ComputeBuffer(numBoids, Marshal.SizeOf(typeof(BoidData)));
-        
 
+        CS.SetInt("BLOCK_SIZE", blockSize);
         CS.SetBuffer(kernelFlock, "boidBufferRead", boidBufferRead);
         CS.SetBuffer(kernelFlock, "boidBufferWrite", boidBufferWrite);
         CS.SetInt("BUFFER_SIZE",numBoids);
