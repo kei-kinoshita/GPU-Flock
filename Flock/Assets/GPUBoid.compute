@@ -5,6 +5,7 @@ struct BoidData
 	float3 position;
 	float3 velocity;
     float3 acceleration;
+    int numNeighbors;
 };
 
 RWStructuredBuffer<BoidData> boidBufferRead;
@@ -14,93 +15,192 @@ float REGION_SIZE;
 float MAX_SPEED;
 float MAX_FORCE;
 float NEIGHBOR_DISTANCE;
+float BOID_RADIUS;
+float3 TARGET_1;
+float3 TARGET_2;
+float3 TARGET_3;
+
 
 void ApplyForce(uint3 id, float3 force)
 {
-    boidBufferWrite[id.x].acceleration = boidBufferRead[id.x].acceleration + force;
+    boidBufferRead[id.x].acceleration = boidBufferRead[id.x].acceleration + force;
 }
 
-[numthreads(256,1,1)]
-void Flock (uint3 id : SV_DispatchThreadID)
+float3 ClampFloat3Magnitude(float3 vector3, float magnitude)
+{
+    if (length(vector3) > magnitude)
+    {
+        return mul(normalize(vector3), magnitude);
+    }
+    else
+    {
+        return vector3;
+    }
+}
+
+float3 Seek(uint3 id, float3 target)
+{
+    float3 desired = target - boidBufferRead[id.x].position;
+    desired = MAX_SPEED * normalize(desired);
+    float3 steer = desired - boidBufferRead[id.x].velocity;
+    steer = ClampFloat3Magnitude(steer, MAX_FORCE);
+    steer = lerp(float3(0, 0, 0), steer, distance(boidBufferRead[id.x].position, target) / 100);
+    return steer;
+
+}
+
+float3 Escape(uint3 id, float3 target)
 {
 
+    float distFromBoidToTarget = distance(boidBufferRead[id.x].position, target);
+    float3 desired = target - boidBufferRead[id.x].position;
+    desired = MAX_SPEED * normalize(desired);
+    float3 steer = boidBufferRead[id.x].velocity - desired;
+    steer = ClampFloat3Magnitude(steer, MAX_FORCE);
+    steer = steer* (distFromBoidToTarget / (REGION_SIZE/5));
+    return steer;
+
+}
 
 
-    float alignCount = 0;
-    float3 alignSum = 0;
 
-
-	[loop]
-    for (int i = 0; i < bufferSize; i++)
-    {
-        alignSum += distance(boidBufferRead[id.x].velocity, boidBufferRead[i].velocity);
-        alignCount++;
-    }
-
-	if (alignCount > 0)
-    {
-        alignSum = alignSum / alignCount;
-        float3 alignForce = 10*alignSum - boidBufferRead[id.x].velocity;
-        //boidBufferWrite[id.x].position = boidBufferRead[id.x].position + alignSum;
-        boidBufferWrite[id.x].acceleration = boidBufferRead[id.x].acceleration + alignForce;
-    }
+[numthreads(16,1,1)]
+void Flock (uint3 id : SV_DispatchThreadID)
+{
 
 	/////// CHECK FOR BOUND$
 
     float3 swerve = float3(0, 0, 0);
 
-	//if (boidBufferRead[id.x].position.x > REGION_SIZE)
- //   {
- //       swerve.x = -MAX_SPEED;
- //   }
- //   else if (boidBufferRead[id.x].position.x < 0)
- //   {
- //       swerve.x = MAX_SPEED;
- //   }
- //   else if (boidBufferRead[id.y].position.y > REGION_SIZE)
- //   {
- //       swerve.y = -MAX_SPEED;
- //   }
- //   else if (boidBufferRead[id.y].position.y < 0)
- //   {
- //       swerve.y = MAX_SPEED;
- //   }
-
-    /// MIRROR$MIRROR ///
-
-    if (boidBufferRead[id.x].position.x > REGION_SIZE)
+	if (boidBufferRead[id.x].position.x > REGION_SIZE)
     {
-        boidBufferRead[id.x].position.x = 0;
+        swerve.x = -MAX_SPEED;
     }
     else if (boidBufferRead[id.x].position.x < 0)
     {
-        boidBufferRead[id.x].position.x = REGION_SIZE;
+        swerve.x = MAX_SPEED;
     }
     else if (boidBufferRead[id.x].position.y > REGION_SIZE)
     {
-        boidBufferRead[id.x].position.y = 0;
+        swerve.y = -MAX_SPEED;
     }
     else if (boidBufferRead[id.x].position.y < 0)
     {
-        boidBufferRead[id.x].position.y = REGION_SIZE;
+        swerve.y = MAX_SPEED;
     }
-
-    //swerve = clamp(swerve, 0, MAX_FORCE);
-    //else if (boidBufferRead[id.z].position.z > REGION_SIZE)
+    //else if (boidBufferRead[id.x].position.z > REGION_SIZE)
     //{
     //    swerve.z = -MAX_SPEED;
     //}
-    //else if (boidBufferRead[id.z].position.z < 0)
+    //else if (boidBufferRead[id.x].position.z < 0)
     //{
     //    swerve.z = MAX_SPEED;
     //}
 
-    boidBufferWrite[id.x].acceleration = boidBufferRead[id.x].acceleration + swerve;
+
+    /// MIRROR$MIRROR ///
+
+    //if (boidBufferRead[id.x].position.x > REGION_SIZE)
+    //{
+    //    boidBufferRead[id.x].position.x = 0;
+    //}
+    //else if (boidBufferRead[id.x].position.x < 0)
+    //{
+    //    boidBufferRead[id.x].position.x = REGION_SIZE;
+    //}
+    //else if (boidBufferRead[id.x].position.y > REGION_SIZE)
+    //{
+    //    boidBufferRead[id.x].position.y = 0;
+    //}
+    //else if (boidBufferRead[id.x].position.y < 0)
+    //{
+    //    boidBufferRead[id.x].position.y = REGION_SIZE;
+    //}
+
+    //swerve = clamp(swerve, 0, MAX_FORCE);
+
+    //boidBufferWrite[id.x].acceleration = boidBufferRead[id.x].acceleration + swerve;
     //boidBufferWrite[id.x].acceleration = clamp(boidBufferWrite[id.x].acceleration, 0, MAX_FORCE);
+    swerve = ClampFloat3Magnitude(swerve, MAX_FORCE);
+    ApplyForce(id, swerve);
 
-	boidBufferWrite[id.x].velocity = boidBufferRead[id.x].velocity + boidBufferRead[id.x].acceleration;
-    //boidBufferWrite[id.x].velocity = clamp(boidBufferWrite[id.x].velocity, 0, MAX_SPEED);
+    
+    float distBetweenBoidAndOther = 0;
+    float3 diffBetweenBoidAndOther = float3(0, 0, 0);
 
-	boidBufferWrite[id.x].position = boidBufferRead[id.x].position + boidBufferRead[id.x].velocity;
+    float alignCount = 0;
+    float3 alignSum = 0;
+
+    float separation = BOID_RADIUS * 2;
+    float3 separationSum = float3(0, 0, 0);
+    int separationCount = 0;
+
+    float3 cohesionSum = float3(0, 0, 0);
+    int cohesionCount = 0;
+
+	[loop]
+    for (int i = 0; i < bufferSize; i++)
+    {
+        distBetweenBoidAndOther = distance(boidBufferRead[id.x].position, boidBufferRead[i].position);
+
+        /// separation stuff
+        if (distBetweenBoidAndOther > 0 && distBetweenBoidAndOther < separation)
+        {
+            diffBetweenBoidAndOther = normalize(boidBufferRead[id.x].position - boidBufferRead[i].position);
+            separationSum += diffBetweenBoidAndOther;
+            separationCount++;
+        }
+
+        
+        if (distBetweenBoidAndOther > 0 && distBetweenBoidAndOther < NEIGHBOR_DISTANCE)
+        {
+            // align stuff
+            alignSum += boidBufferRead[i].velocity;
+            alignCount++;
+
+            /// cohesion stuff
+            cohesionSum += boidBufferRead[i].position;
+            cohesionCount++;
+        }
+
+        
+    }
+
+    //ApplyForce(id, Escape(id, TARGET_1));
+    //ApplyForce(id, Seek(id, TARGET_2));
+    //ApplyForce(id, Seek(id, TARGET_3));
+
+    if (cohesionCount > 0)
+    {
+        cohesionSum /= cohesionCount;
+        ApplyForce(id, Seek(id, cohesionSum));
+
+        boidBufferRead[id.x].numNeighbors = cohesionCount;
+    }
+
+    if (alignCount > 0)
+    {
+        alignSum = alignSum / alignCount;
+        alignSum = normalize(alignSum) * MAX_SPEED;
+        //alignSum = ClampFloat3Magnitude(alignSum, MAX_SPEED);
+        alignSum = ClampFloat3Magnitude(alignSum - boidBufferRead[id.x].velocity,MAX_FORCE);
+        ApplyForce(id, alignSum);
+    }
+
+    if (separationCount > 0)
+    {
+        separationSum = separationSum / separationCount;
+        separationSum = normalize(separationSum) * MAX_SPEED;
+        separationSum = separationSum - boidBufferRead[id.x].velocity;
+        separationSum = ClampFloat3Magnitude(separationSum, MAX_FORCE);
+        ApplyForce(id, separationSum);
+    }
+
+
+    boidBufferWrite[id.x].velocity = ClampFloat3Magnitude(boidBufferRead[id.x].velocity + boidBufferRead[id.x].acceleration, MAX_SPEED);
+
+	boidBufferWrite[id.x].position = boidBufferRead[id.x].position + boidBufferWrite[id.x].velocity;
     boidBufferWrite[id.x].acceleration = float3(0, 0, 0);
+    //// fix below later
+    boidBufferRead[id.x] = boidBufferWrite[id.x];
 }

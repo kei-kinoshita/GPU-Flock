@@ -57,7 +57,6 @@ public class BoidController : MonoBehaviour {
             boids[i].velocity = Vector3.ClampMagnitude(boids[i].velocity + boids[i].acceleration, maxSpeed);
             //boids[i].velocity += boids[i].acceleration;
             boids[i].position += boids[i].velocity;
-
         }
     }
 
@@ -71,7 +70,7 @@ public class BoidController : MonoBehaviour {
 
             CheckForBounds(ref boids[i]);
             FlockWithSpatialHash(ref boids[i]);
-            ApplyForce(ref boids[i], 0.5f*Escape(ref boids[i], target.transform.position));
+            //ApplyForce(ref boids[i], 0.5f*Escape(ref boids[i], target.transform.position));
 
             boids[i].velocity = Vector3.ClampMagnitude(boids[i].velocity + boids[i].acceleration, maxSpeed);
             boids[i].position += boids[i].velocity;
@@ -500,9 +499,6 @@ public class BoidController : MonoBehaviour {
         }
     }
 
-    //{
-    //        //Gizmos.DrawSphere(boids[i].position,0.5f);
-    //    }
     private void OnDrawGizmos()
     {
         for (int i = 0; i < numBoids; i++)

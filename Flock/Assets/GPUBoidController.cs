@@ -10,13 +10,21 @@ public class GPUBoidController : MonoBehaviour {
     public float maxSpeed;
     public float maxForce;
     public float neighborDistance;
+    public float boidRadius;
     public ComputeShader CS;
+    public Shader BoidRenderer;
+    public GameObject target1;
+    public GameObject target2;
+    public GameObject target3;
+
 
     private BoidData[] boidsIn;
-    BoidData[] boidsOut;
+    private BoidData[] boidsOut;
 
     private ComputeBuffer boidBufferRead;
     private ComputeBuffer boidBufferWrite;
+
+    private Material BoidMat;
 
 
     private int kernelFlock;
@@ -33,10 +41,15 @@ public class GPUBoidController : MonoBehaviour {
     // Update is called once per frame
     void Update()
     {
+        CS.SetVector("TARGET_1", target1.transform.position);
+        CS.SetVector("TARGET_2", target2.transform.position);
+        CS.SetVector("TARGET_3", target3.transform.position);
 
-        boidBufferRead.SetData(boidsIn);
-        CS.Dispatch(kernelFlock, boidsIn.Length, 1, 1);
-        boidBufferWrite.GetData(boidsIn);
+        
+        CS.Dispatch(kernelFlock, boidsIn.Length/16, 1, 1);
+
+
+        //boidBufferWrite.GetData(boidsIn);
 
         //SwapBuffer(ref boidBufferRead, ref boidBufferWrite);
        
@@ -48,14 +61,10 @@ public class GPUBoidController : MonoBehaviour {
         public Vector3 position;
         public Vector3 velocity;
         public Vector3 acceleration;
+        public int numNeighbors;
     }
 
 
-    private void OnDisable()
-    {
-        CSReleaseBuffer();
-        _DrawGizmos = false;
-    }
 
     void SetUpCS()
     {
@@ -68,6 +77,7 @@ public class GPUBoidController : MonoBehaviour {
             boidsIn[i].position = new Vector3(Random.value * regionSize, Random.value * regionSize, 0);
             boidsIn[i].velocity = new Vector3(Random.Range(1f, -1f), Random.Range(1f, -1f), 0);
             boidsIn[i].acceleration = Vector3.zero;
+            boidsIn[i].numNeighbors = 0;
         }
 
 
@@ -84,18 +94,39 @@ public class GPUBoidController : MonoBehaviour {
         CS.SetFloat("MAX_SPEED", maxSpeed);
         CS.SetFloat("MAX_FORCE", maxForce);
         CS.SetFloat("NEIGHBOR_DISTANCE", neighborDistance);
+        CS.SetFloat("BOID_RADIUS", boidRadius);
+
+
+        boidBufferRead.SetData(boidsIn);
     }
 
-    private void OnDrawGizmos()
+    private void OnRenderObject()
     {
-        if (_DrawGizmos)
-        {
-            Gizmos.color = Color.white;
-            foreach (BoidData b in boidsIn)
-            {
-                Gizmos.DrawLine(b.position, b.position + b.velocity);
-            }
-        }
+        if (BoidMat == null)
+            BoidMat = new Material(BoidRenderer);
+
+        BoidMat.SetBuffer("BoidBuffer", boidBufferWrite);
+        BoidMat.SetPass(0);
+        Graphics.DrawProcedural(MeshTopology.Points, boidsIn.Length);
+    }
+
+    //private void OnDrawGizmos()
+    //{
+    //    if (_DrawGizmos)
+    //    {
+    //        Gizmos.color = Color.white;
+    //        foreach (BoidData b in boidsIn)
+    //        {
+    //            Gizmos.DrawLine(b.position, b.position + b.velocity);
+    //        }
+    //    }
+    //}
+
+
+    private void OnDisable()
+    {
+        CSReleaseBuffer();
+        _DrawGizmos = false;
     }
 
     private void CSReleaseBuffer()
