@@ -132,6 +132,7 @@
   <ItemGroup>
     <None Include="Assets\GPUBoid.compute" />
     <None Include="Assets\GPUBoidRenderer.shader" />
+    <None Include="Assets\GPUBoidTrailRenderer.shader" />
     <None Include="Assets\PostProcessing\Editor Resources\Monitors\HistogramCompute.compute" />
     <None Include="Assets\PostProcessing\Editor Resources\Monitors\HistogramRender.shader" />
     <None Include="Assets\PostProcessing\Editor Resources\Monitors\ParadeRender.shader" />

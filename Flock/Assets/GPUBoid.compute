@@ -1,4 +1,5 @@
 ﻿#pragma kernel Flock
+//#pragma kernel TrailCalc
 
 struct BoidData
 {
@@ -22,14 +23,28 @@ struct Magnet
     bool isAttractor;
 };
 
+struct Trail
+{
+    float3 position;
+    int trailNum;
+    int numNeighbors;
+};
+
 RWStructuredBuffer<BoidData> boidBufferRead;
 RWStructuredBuffer<BoidData> boidBufferWrite;
 RWStructuredBuffer<Magnet> magnetBufferRead;
+
+RWStructuredBuffer<Trail> trailBuffer;
 
 #define BLOCK_SIZE 256
 
 
 int BUFFER_SIZE;
+
+//uint TRAIL_BUFFER_SIZE;
+uint NUM_TRAILS;
+uint CURR_TRAIL_NUM;
+
 float DELTA_TIME;
 float REGION_SIZE;
 float MAX_SPEED;
@@ -40,9 +55,7 @@ float BOID_RADIUS;
 
 int NUM_MAGNETS;
 
-float3 TARGET_1;
-float3 TARGET_2;
-float3 TARGET_3;
+float3 MOUSE_POS;
 
 
 void ApplyForce(uint3 id, float3 force)
@@ -92,6 +105,30 @@ float3 SeekAttractor(uint3 id, float3 target)
     return steer;
 }
 
+
+//// seek with arrive
+float3 SeekWithArrive(uint3 id, float3 target)
+{
+    float3 desired = target - boidBufferRead[id.x].position;
+    float distance = length(desired);
+    desired = normalize(desired);
+
+    if (distance < 2 * NEIGHBOR_DISTANCE)
+    {
+        float m = smoothstep(0, 2 * NEIGHBOR_DISTANCE, distance) * MAX_SPEED;
+        desired = m * desired;
+    }
+    else
+    {
+        //return float3(0, 0, 0);
+        desired = desired * MAX_SPEED;
+    }
+    
+    float3 steer = desired - boidBufferRead[id.x].velocity;
+    steer = ClampFloat3Magnitude(steer, MAX_FORCE);
+    return steer;
+}
+
 float3 Escape(uint3 id, float3 target)
 {
     float distFromBoidToTarget = distance(boidBufferRead[id.x].position, target);
@@ -100,7 +137,7 @@ float3 Escape(uint3 id, float3 target)
     float3 steer = boidBufferRead[id.x].velocity - desired;
     steer = ClampFloat3Magnitude(steer, MAX_FORCE);
     //steer = steer* (distFromBoidToTarget / (REGION_SIZE/5));
-    steer = ((NEIGHBOR_DISTANCE*2)*pow((1-smoothstep(0, NEIGHBOR_DISTANCE*2, distFromBoidToTarget)),2) ) *steer;
+    steer = ((NEIGHBOR_DISTANCE*4)*pow((1-smoothstep(0, NEIGHBOR_DISTANCE*2, distFromBoidToTarget)),2) ) *steer;
 
     return steer;
 }
@@ -109,33 +146,35 @@ float3 Escape(uint3 id, float3 target)
 [numthreads(BLOCK_SIZE,1,1)]
 void Flock (uint3 id : SV_DispatchThreadID)
 {
+    //// trail stuff
+    
 	/////// CHECK FOR BOUND$
     float3 swerve = float3(0, 0, 0);
 
-	if (boidBufferRead[id.x].position.x > REGION_SIZE)
+	if (boidBufferRead[id.x].position.x > REGION_SIZE - NEIGHBOR_DISTANCE)
     {
         swerve.x = -MAX_SPEED;
     }
-    else if (boidBufferRead[id.x].position.x < 0)
+    else if (boidBufferRead[id.x].position.x < 0 + NEIGHBOR_DISTANCE)
     {
         swerve.x = MAX_SPEED;
     }
-    else if (boidBufferRead[id.x].position.y > REGION_SIZE)
+    else if (boidBufferRead[id.x].position.y > REGION_SIZE - NEIGHBOR_DISTANCE)
     {
         swerve.y = -MAX_SPEED;
     }
-    else if (boidBufferRead[id.x].position.y < 0)
+    else if (boidBufferRead[id.x].position.y < 0 + NEIGHBOR_DISTANCE)
     {
         swerve.y = MAX_SPEED;
     }
-    //else if (boidBufferRead[id.x].position.z > REGION_SIZE)
-    //{
-    //    swerve.z = -MAX_SPEED;
-    //}
-    //else if (boidBufferRead[id.x].position.z < 0)
-    //{
-    //    swerve.z = MAX_SPEED;
-    //}
+    else if (boidBufferRead[id.x].position.z > REGION_SIZE)
+    {
+        swerve.z = -MAX_SPEED;
+    }
+    else if (boidBufferRead[id.x].position.z < 0)
+    {
+        swerve.z = MAX_SPEED;
+    }
 
 
 
@@ -190,7 +229,7 @@ void Flock (uint3 id : SV_DispatchThreadID)
         {
             if (magnetBufferRead[i].isAttractor)
             {
-                ApplyForce(id, SeekAttractor(id, magnetBufferRead[i].position));
+                ApplyForce(id, SeekWithArrive(id, magnetBufferRead[i].position));
             }
             else
             {
@@ -200,14 +239,13 @@ void Flock (uint3 id : SV_DispatchThreadID)
 
     }
 
-    //ApplyForce(id, Escape(id, TARGET_1));
-    //ApplyForce(id, Escape(id, TARGET_2));
-    //ApplyForce(id, Escape(id, TARGET_3));
+    ApplyForce(id, Escape(id, MOUSE_POS));
+
 
     if (cohesionCount > 0)
     {
         cohesionSum /= cohesionCount;
-        ApplyForce(id, Seek(id, cohesionSum));
+        ApplyForce(id, SeekWithArrive(id, cohesionSum));
     }
 
     if (alignCount > 0)
@@ -231,10 +269,31 @@ void Flock (uint3 id : SV_DispatchThreadID)
     }
 
 
+   
+    //AllMemoryBarrierWithGroupSync();
+
     boidBufferWrite[id.x].velocity = ClampFloat3Magnitude(boidBufferRead[id.x].velocity + boidBufferRead[id.x].acceleration, MAX_SPEED);
 
 	boidBufferWrite[id.x].position = boidBufferRead[id.x].position + boidBufferWrite[id.x].velocity*DELTA_TIME;
     boidBufferWrite[id.x].acceleration = float3(0, 0, 0);
     //// fix below later
     boidBufferRead[id.x] = boidBufferWrite[id.x];
+
+
+    uint trailNumber = (id.x * NUM_TRAILS) + CURR_TRAIL_NUM;
+
+    trailBuffer[trailNumber].position = boidBufferWrite[id.x].position;
+    trailBuffer[trailNumber].trailNum = CURR_TRAIL_NUM;
+    trailBuffer[trailNumber].numNeighbors = cohesionCount;
+
 }
+
+//[numthreads(BLOCK_SIZE,1,1)]
+//void TrailCalc(uint3 id : SV_DispatchThreadID)
+//{
+//    uint trailNumber = (id.x * NUM_TRAILS) + CURR_TRAIL_NUM;
+
+//    trailBuffer[trailNumber].position = boidBufferRead[id.x].position;
+//    trailBuffer[trailNumber].trailNum = CURR_TRAIL_NUM;
+//}
+
