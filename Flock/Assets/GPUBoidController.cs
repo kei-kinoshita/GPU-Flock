@@ -40,6 +40,7 @@ public class GPUBoidController : MonoBehaviour {
     private int trailBufferSize;
     public int numTrails;
     private int currTrailNum;
+    private int TrailKernel;
 
 	// Use this for initialization
 	void Start () {
@@ -105,6 +106,7 @@ public class GPUBoidController : MonoBehaviour {
         BoidTrailMat.SetInt("CURR_TRAIL_NUM", currTrailNum);
 
         CS.Dispatch(kernelFlock, boidsIn.Length/blockSize, 1, 1);
+        //CS.Dispatch(TrailKernel, boidsIn.Length / blockSize, 1, 1);
 
 
         //boidBufferWrite.GetData(boidsIn);
@@ -175,10 +177,16 @@ public class GPUBoidController : MonoBehaviour {
 
 
         kernelFlock = CS.FindKernel("Flock");
+        //TrailKernel = CS.FindKernel("TrailUpdate");
+
         boidBufferRead = new ComputeBuffer(numBoids, Marshal.SizeOf(typeof(BoidData)));
         boidBufferWrite = new ComputeBuffer(numBoids, Marshal.SizeOf(typeof(BoidData)));
         CS.SetBuffer(kernelFlock, "boidBufferRead", boidBufferRead);
         CS.SetBuffer(kernelFlock, "boidBufferWrite", boidBufferWrite);
+
+
+        CS.SetBuffer(TrailKernel, "boidBufferRead", boidBufferRead);
+        //CS.SetBuffer(TrailKernel, "boidBufferWrite", boidBufferWrite);
 
         // set up trail;
         trailBufferSize = numTrails * numBoids;
@@ -191,7 +199,9 @@ public class GPUBoidController : MonoBehaviour {
         }
         boidTrailBuffer.SetData(TrailData);
         CS.SetBuffer(kernelFlock, "trailBuffer", boidTrailBuffer);
- 
+        //CS.SetBuffer(TrailKernel, "trailBuffer", boidTrailBuffer);
+
+
         CS.SetInt("BLOCK_SIZE", blockSize);
         CS.SetInt("BUFFER_SIZE",numBoids);
         CS.SetFloat("REGION_SIZE", regionSize);
@@ -231,7 +241,7 @@ public class GPUBoidController : MonoBehaviour {
 
         BoidMat.SetBuffer("BoidBuffer", boidBufferWrite);
         BoidMat.SetPass(0);
-        //Graphics.DrawProcedural(MeshTopology.Points, boidsIn.Length);
+        Graphics.DrawProcedural(MeshTopology.Points, boidsIn.Length);
     }
 
     //private void OnDrawGizmos()

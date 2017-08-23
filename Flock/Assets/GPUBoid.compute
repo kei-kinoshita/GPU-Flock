@@ -1,5 +1,5 @@
 ﻿#pragma kernel Flock
-//#pragma kernel TrailCalc
+//#pragma kernel TrailUpdate;
 
 struct BoidData
 {
@@ -8,13 +8,6 @@ struct BoidData
     float3 acceleration;
     int numNeighbors;
 };
-
-//struct BoidFlockCalcuations
-//{
-//    float3 align;
-//    float3 cohesion;
-//    float3 separation;
-//};
 
 struct Magnet
 {
@@ -140,6 +133,16 @@ float3 Escape(uint3 id, float3 target)
     steer = ((NEIGHBOR_DISTANCE*4)*pow((1-smoothstep(0, NEIGHBOR_DISTANCE*2, distFromBoidToTarget)),2) ) *steer;
 
     return steer;
+}
+
+
+[numthreads(BLOCK_SIZE, 1, 1)]
+void TrailUpdate(uint3 id : SV_DispatchThreadID)
+{
+    uint trailNumber = (id.x * NUM_TRAILS) + CURR_TRAIL_NUM;
+    trailBuffer[trailNumber].position = boidBufferRead[id.x].position;
+    trailBuffer[trailNumber].trailNum = CURR_TRAIL_NUM;
+    
 }
 
 
@@ -288,7 +291,7 @@ void Flock (uint3 id : SV_DispatchThreadID)
 
 }
 
-//[numthreads(BLOCK_SIZE,1,1)]
+
 //void TrailCalc(uint3 id : SV_DispatchThreadID)
 //{
 //    uint trailNumber = (id.x * NUM_TRAILS) + CURR_TRAIL_NUM;
