@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 
 public class GPUBoidController : MonoBehaviour {
 
+    public bool is3D;
     public int numBoids;
     public float regionSize;
     public float maxSpeed;
@@ -161,8 +162,8 @@ public class GPUBoidController : MonoBehaviour {
         Random.InitState(42);
         for (int i=0; i<numBoids; i++)
         {
-            bool zaxis = false;
-            if (!zaxis)
+            //bool zaxis = false;
+            if (!is3D)
             {
                 boidsIn[i].position = new Vector3(Random.value * regionSize, Random.value * regionSize, 0);
                 boidsIn[i].velocity = new Vector3(Random.Range(1f, -1f) * maxSpeed, Random.Range(1f, -1f) * maxSpeed, 0);
